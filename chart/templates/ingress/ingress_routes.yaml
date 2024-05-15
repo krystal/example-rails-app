@@ -1,0 +1,54 @@
+{{ $root := . }}
+{{ $hosts := list (dig "exampleApp" "webHostname" .Values.appConfigDefaults.exampleApp.webHostname .Values.appConfig) }}
+{{ $hosts = uniq $hosts }}
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ include "app.name" . }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "app.labels" . | nindent 4 }}
+  annotations:
+    {{- include "app.argocdAnnotations" (dict "root" . "wave" 10) | nindent 4 }}
+spec:
+  entryPoints:
+    - {{ .Values.ingressRoute.secureEntryPoint }}
+  routes:
+    {{- range $hosts }}
+    - kind: Rule
+      match: Host(`{{ . }}`)
+      services:
+        - name: {{ include "app.generateName" (dict "root" $root "suffix" "web") }}
+          port: {{ $root.Values.services.web.port}}
+          scheme: http
+    {{ end }}
+  tls:
+    secretName: {{ include "app.generateName" (dict "root" . "suffix" "tls") }}
+    domains:
+      - main: {{ (dig "exampleApp" "webHostname" .Values.appConfigDefaults.exampleApp.webHostname .Values.appConfig) }}
+        sans:
+        {{- range $_, $host := $hosts }}
+          - {{ $host }}
+        {{- end}}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ include "app.generateName" (dict "root" $root "suffix" "redirect") }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "app.labels" . | nindent 4 }}
+  annotations:
+    {{- include "app.argocdAnnotations" (dict "root" . "wave" 10) | nindent 4 }}
+spec:
+  entryPoints:
+    - {{ .Values.ingressRoute.insecureEntryPoint }}
+  routes:
+    {{- range $hosts }}
+    - kind: Rule
+      match: Host(`{{ . }}`)
+      middlewares:
+        - name: {{ include "app.generateName" (dict "root" $root "suffix" "https-redirect") }}
+      services:
+        - name: {{ include "app.generateName" (dict "root" $root "suffix" "web") }}
+          port: {{ $root.Values.services.web.port}}
+          scheme: http
+    {{ end }}

@@ -1,0 +1,31 @@
+{{- if .Values.deployment.preDeploymentJob -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{include "app.generateName" (dict "root" . "suffix" "update")}}
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "app.labels" . | nindent 4 }}
+  annotations:
+    {{- include "app.argocdAnnotations" (dict "root" . "wave" 5 "hook" "Sync" "deletePolicy" "BeforeHookCreation") | nindent 4 }}
+    {{- include "app.helmAnnotations" (dict "root" . "hook" "post-install,pre-upgrade" "deletePolicy" "hook-succeeded,before-hook-creation" "weight" 5) | nindent 4 }}
+spec:
+  backoffLimit: 20
+  template:
+    metadata:
+      name: {{include "app.generateName" (dict "root" . "suffix" "update")}}
+      labels:
+        {{- include "app.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      imagePullSecrets: {{ toYaml .Values.image.pullSecrets | nindent 8 }}
+      containers:
+        - name: update
+          image: {{ include "app.imageURL" .  }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          command:
+            - bin/rake
+            - app:update
+          env:
+            {{- include "app.envVars" . | nindent 12 }}
+            {{- include "app.wait_for" . | nindent 12 }}
+{{- end -}}

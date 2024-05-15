@@ -1,0 +1,58 @@
+{{- $deployment := .Values.deployments.worker -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{include "app.generateName" (dict "root" . "suffix" "worker")}}
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "app.labels" . | nindent 4 }}
+  annotations:
+    {{- include "app.argocdAnnotations" (dict "root" . "wave" 10) | nindent 4 }}
+spec:
+  replicas: {{ $deployment.replicas }}
+  selector:
+    matchLabels:
+      {{- include "app.selectorLabels" . | nindent 6 }}
+      krystal.io/component: worker
+  template:
+    metadata:
+      labels:
+        {{- include "app.selectorLabels" . | nindent 8 }}
+        krystal.io/component: worker
+    spec:
+      imagePullSecrets: {{ toYaml .Values.image.pullSecrets | nindent 8 }}
+      terminationGracePeriodSeconds: {{ $deployment.terminationGracePeriodSeconds | default 30 }}
+      {{- include "app.affinityPreferSeperateNodes" (dict "root" . "component" "worker") | nindent 6 }}
+      containers:
+        - name: worker
+          image: {{ include "app.imageURL" .  }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          command:
+            - bin/sidekiq
+          env:
+            {{- include "app.envVars" . | nindent 12 }}
+            {{- include "app.wait_for" . | nindent 12 }}
+          ports:
+            - name: health
+              containerPort: {{ $deployment.healthServerPort }}
+              protocol: TCP
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 5"]
+          resources:
+            limits:
+              cpu: {{ $deployment.resources.limits.cpu }}
+              memory: {{ $deployment.resources.limits.memory }}
+            requests:
+              cpu: {{ $deployment.resources.requests.cpu }}
+              memory: {{ $deployment.resources.requests.memory }}
+          livenessProbe:
+            failureThreshold: 30
+            periodSeconds: 2
+            httpGet:
+              path: /health
+              port: health
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: health

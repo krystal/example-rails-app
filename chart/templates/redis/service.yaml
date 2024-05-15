@@ -1,0 +1,21 @@
+{{- if eq .Values.redis.mode "builtin" }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "app.generateName" (dict "root" . "suffix" "redis") }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+  annotations:
+    {{ include "app.argocdAnnotations" (dict "root" . "wave" 1) | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 6379
+      targetPort: redis
+      protocol: TCP
+      name: redis
+  selector:
+    {{- include "app.selectorLabels" . | nindent 4 }}
+    component: redis
+{{- end }}

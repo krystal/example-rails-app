@@ -1,0 +1,35 @@
+version: "3"
+services:
+  postgres:
+    image: postgres:16.2
+    restart: always
+    shm_size: 512mb
+    environment:
+      POSTGRES_DB: example_app_test
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+  
+  redis:
+    image: redis:7.2.4
+    restart: always
+    ports:
+      - "6379:6379"
+  
+  app:
+    image: ${APP_IMAGE_URL}
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      RAILS_ENV: test
+      POSTGRES_HOST: postgres
+      POSTGRES_USERNAME: postgres
+      POSTGRES_PASSWORD: password
+      REDIS_HOST: redis
+      WAIT_FOR_TIMEOUT: 90
+      WAIT_FOR_TARGETS: |-
+        postgres:5432
+        redis:6379
+    volumes:
+      - "${CACHE_DIR}:/cache"

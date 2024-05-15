@@ -1,0 +1,104 @@
+require:
+  - rubocop-rails
+  - rubocop-performance
+  - rubocop-rspec
+  - rubocop-rspec_rails
+  - rubocop-factory_bot
+
+AllCops:
+  Exclude:
+    - bin/*
+    - db/schema.rb
+    - vendor/**/*
+  NewCops: enable
+  TargetRubyVersion: 3.3
+
+Layout/EmptyLinesAroundBlockBody:
+  EnforcedStyle: no_empty_lines
+Layout/EmptyLinesAroundClassBody:
+  EnforcedStyle: empty_lines
+Layout/EmptyLinesAroundModuleBody:
+  EnforcedStyle: empty_lines_except_namespace
+Layout/FirstHashElementIndentation:
+  Enabled: false
+Layout/SpaceInLambdaLiteral:
+  EnforcedStyle: require_space
+Lint/AssignmentInCondition:
+  Enabled: false
+Lint/BooleanSymbol:
+  Enabled: false
+# As above, just flag them.
+Lint/UnusedBlockArgument:
+  AutoCorrect: false
+Lint/UnusedMethodArgument:
+  AutoCorrect: false
+Metrics/AbcSize:
+  Max: 100
+Metrics/BlockLength:
+  Exclude:
+    - spec/**/*.rb
+    - db/schema.rb
+    - db/migrate/**/*.rb
+    - config/routes.rb
+    - config/environments/**/*.rb
+    - lib/tasks/*.rake
+    - lib/example_app/config_schema.rb
+Metrics/ClassLength:
+  Max: 250
+Metrics/CyclomaticComplexity:
+  Max: 50
+Metrics/MethodLength:
+  Max: 30
+Metrics/ModuleLength:
+  Enabled: false
+Metrics/ParameterLists:
+  CountKeywordArgs: false
+  Max: 5
+Metrics/PerceivedComplexity:
+  Max: 100
+Naming/AccessorMethodName:
+  Enabled: false
+Naming/PredicateName:
+  Enabled: false
+RSpec/AnyInstance:
+  Enabled: false
+RSpec/ExampleLength:
+  Max: 30
+RSpec/MultipleExpectations:
+  Enabled: false
+RSpec/MultipleMemoizedHelpers:
+  Max: 10
+RSpecRails/HaveHttpStatus:
+  Exclude:
+    - spec/apis/core_api/**/*
+Rails/DynamicFindBy:
+  Whitelist:
+    - find_by_record_id
+    - find_by_record_id!
+    - find_by_token
+    - find_by_token!
+Style/AccessorGrouping:
+  Enabled: false
+Style/ConditionalAssignment:
+  EnforcedStyle: assign_inside_condition
+  IncludeTernaryExpressions: false
+Style/Documentation:
+  Enabled: false
+Style/EmptyMethod:
+  EnforcedStyle: expanded
+Style/FrozenStringLiteralComment:
+  Enabled: true
+  SafeAutoCorrect: true
+Style/IfUnlessModifier:
+  Enabled: false
+Style/MultilineBlockChain:
+  Exclude:
+    - spec/**/*.rb
+Style/RegexpLiteral:
+  AllowInnerSlashes: true
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+Style/SymbolArray:
+  EnforcedStyle: brackets
+Style/SymbolProc:
+  Enabled: false

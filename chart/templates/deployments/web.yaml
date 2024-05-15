@@ -1,0 +1,73 @@
+{{- $deployment := .Values.deployments.web -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{include "app.generateName" (dict "root" . "suffix" "web")}}
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "app.labels" . | nindent 4 }}
+  annotations:
+    {{- include "app.argocdAnnotations" (dict "root" . "wave" 10) | nindent 4 }}
+spec:
+  replicas: {{ $deployment.replicas }}
+  selector:
+    matchLabels:
+      {{- include "app.selectorLabels" . | nindent 6 }}
+      krystal.io/component: web
+  template:
+    metadata:
+      labels:
+        {{- include "app.selectorLabels" . | nindent 8 }}
+        krystal.io/component: web
+    spec:
+      imagePullSecrets: {{ toYaml .Values.image.pullSecrets | nindent 8 }}
+      terminationGracePeriodSeconds: {{ $deployment.terminationGracePeriodSeconds | default 30 }}
+      {{- include "app.affinityPreferSeperateNodes" (dict "root" . "component" "web") | nindent 6 }}
+      containers:
+        - name: web
+          image: {{ include "app.imageURL" .  }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          command:
+            - bin/puma
+            - -C
+            - config/puma.rb
+          env:
+            {{- include "app.envVars" . | nindent 12 }}
+            {{- include "app.wait_for" . | nindent 12 }}
+            - name: PORT
+              value: {{ $deployment.containerPort | quote }}
+          ports:
+            - name: http
+              containerPort: {{ $deployment.containerPort }}
+              protocol: TCP
+            {{- if .Values.prometheus.enabled }}
+            - name: metrics
+              containerPort: {{ .Values.prometheus.defaultExporterPort }}
+              protocol: TCP
+            {{- end }}
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 5"]
+          resources:
+            limits:
+              cpu: {{ $deployment.resources.limits.cpu }}
+              memory: {{ $deployment.resources.limits.memory }}
+            requests:
+              cpu: {{ $deployment.resources.requests.cpu }}
+              memory: {{ $deployment.resources.requests.memory }}
+          livenessProbe:
+            failureThreshold: 30
+            periodSeconds: 2
+            httpGet:
+              path: /up
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: "{{ (dig "exampleApp" "webHostname" .Values.appConfigDefaults.exampleApp.webHostname .Values.appConfig) }}"
+          readinessProbe:
+            httpGet:
+              path: /up
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: "{{ (dig "exampleApp" "webHostname" .Values.appConfigDefaults.exampleApp.webHostname .Values.appConfig) }}"

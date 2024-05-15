@@ -1,0 +1,22 @@
+<% config = ExampleApp.config.postgres %>
+
+default: &default
+  adapter: postgresql
+  encoding: <%= config.encoding.to_s.inspect %>
+  pool: <%= config.pool_size %>
+  username: <%= config.username.to_s.inspect %>
+  password: <%= config.password.to_s.inspect %>
+  host: <%= config.host.to_s.inspect %>
+  database: <%= config.database_name.to_s.inspect %>
+  prepared_statements: true
+  advisory_locks: true
+
+development:
+  <<: *default
+
+test:
+  <<: *default
+  database: <%= config.test_database_name.to_s.inspect %>
+
+production:
+  <<: *default

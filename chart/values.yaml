@@ -1,0 +1,110 @@
+image:
+  name: ghcr.io/krystal/example-app
+  pullPolicy: IfNotPresent
+  tag: null
+
+services:
+  web:
+    type: ClusterIP
+    port: 80
+    externalTrafficPolicy: null
+
+postgres:
+  mode: builtin
+  builtin:
+    image: postgres:16.3
+    username: exampleapp
+    databaseName: exampleapp
+  external:
+    secret:
+      name: null
+      keys:
+        host: host
+        username: username
+        password: password
+        database: database
+redis:
+  mode: builtin
+  builtin:
+    image: redis:7.2.4
+  external:
+    secret:
+      name: null
+      keys:
+        host: host
+        password: password
+        database: database
+
+deployments:
+  web:
+    replicas: 2
+    containerPort: 5000
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 750Mi
+      requests:
+        cpu: 100m
+        memory: 250Mi
+  worker:
+    replicas: 2
+    healthServerPort: 9000
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 750Mi
+      requests:
+        cpu: 100m
+        memory: 250Mi
+
+deployment:
+  argocd: false
+  commitRef: null
+  pullRequestURL: null
+  preDeploymentJob: true
+
+externalCertificateIssuer:
+  kind: ClusterIssuer
+  name: krystal
+
+global:
+  storageClass: nfs
+
+ingressRoute:
+  insecureEntryPoint: web
+  secureEntryPoint: websecure
+
+prometheus: 
+  enabled: true
+  defaultExporterPort: 9000
+
+appConfigDefaults:
+  waitForMigrations: 
+    enabled: true
+
+  rails:
+    secretKeyBase:
+      generatedValue:
+        key: secret-key-base
+
+  webServer:
+    defaultBindAddress: 0.0.0.0
+
+  worker:
+    defaultHealthServerBindAddress: 0.0.0.0
+    defaultHealthServerPort: 9000
+
+  encryption:
+    primaryKey:
+      generatedValue:
+        key: encryption-primary-key
+    deterministicKey:
+      generatedValue:
+        key: encryption-deterministic-key
+    keyDerivationSalt:
+      generatedValue:
+        key: encryption-key-derivation-salt
+
+appConfig: {}
+  # This hash can contain all the app configuration which is available.
+  # Refer to CONFIG.md for details.

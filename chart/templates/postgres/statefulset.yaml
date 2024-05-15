@@ -1,0 +1,50 @@
+{{- if eq .Values.postgres.mode "builtin" }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "app.generateName" (dict "root" . "suffix" "postgres") }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+  annotations:
+    {{ include "app.argocdAnnotations" (dict "root" . "wave" 1) | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "app.selectorLabels" . | nindent 6 }}
+      component: postgres
+  template:
+    metadata:
+      labels:
+        {{- include "app.selectorLabels" . | nindent 8 }}
+        component: postgres
+    spec:
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: {{ include "app.generateName" (dict "root" . "suffix" "postgres") }}
+      containers:
+        - name: postgres
+          image: {{ .Values.postgres.builtin.image }}
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgres/data
+          ports:
+            - name: postgres
+              containerPort: 5432
+              protocol: TCP
+          env:
+            - name: POSTGRES_USER
+              {{- include "app.postgres.username" . | nindent 14 }}
+            - name: POSTGRES_PASSWORD
+              {{- include "app.postgres.password" . | nindent 14 }}
+            - name: POSTGRES_DB
+              {{- include "app.postgres.database" . | nindent 14 }}
+          livenessProbe:
+            tcpSocket:
+              port: postgres
+          readinessProbe:
+            tcpSocket:
+              port: postgres
+{{- end }}

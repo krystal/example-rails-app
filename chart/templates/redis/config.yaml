@@ -1,0 +1,18 @@
+{{- if eq .Values.redis.mode "builtin" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "app.generateName" (dict "root" . "suffix" "redis") }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+  annotations:
+    {{ include "app.argocdAnnotations" (dict "root" . "wave" 1) | nindent 4 }}
+data:
+  redis.conf: |-
+    dir /data
+    appendonly yes
+    save ""
+    bind 0.0.0.0
+    requirepass "$PASSWORD"
+{{- end }}

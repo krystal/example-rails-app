@@ -1,0 +1,75 @@
+{{- if eq .Values.redis.mode "builtin" }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "app.generateName" (dict "root" . "suffix" "redis") }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+  annotations:
+    {{ include "app.argocdAnnotations" (dict "root" . "wave" 1) | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "app.selectorLabels" . | nindent 6 }}
+      component: redis
+  template:
+    metadata:
+      labels:
+        {{- include "app.selectorLabels" . | nindent 8 }}
+        component: redis
+    spec:
+      volumes:
+        - name: config
+          emptyDir: {}
+        - name: source-config
+          configMap:
+            name: {{ include "app.generateName" (dict "root" . "suffix" "redis") }}
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: {{ include "app.generateName" (dict "root" . "suffix" "redis") }}
+      initContainers:
+      - name: redis-config-mapper
+        image: busybox
+        volumeMounts:
+          - name: source-config
+            mountPath: /source
+          - name: config
+            mountPath: /target
+        env:
+          - name: PASSWORD
+            {{ include "app.redis.password" . | nindent 12 }}
+        command:
+          - sh
+          - -c
+          - >-
+            cat /source/redis.conf |
+            sed -e "s/\$PASSWORD/$(echo $PASSWORD)/g"
+            > /target/redis.conf
+      containers:
+        - name: redis
+          image: {{ .Values.redis.builtin.image }}
+          command:
+            - redis-server
+            - /config/redis.conf
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+            - name: config
+              mountPath: /config
+          ports:
+            - name: redis
+              containerPort: 6379
+              protocol: TCP
+          livenessProbe:
+            tcpSocket:
+              port: redis
+          readinessProbe:
+            tcpSocket:
+              port: redis
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+{{- end }}

@@ -1,0 +1,137 @@
+name: CI
+on:
+  push:
+    branches-ignore:
+      - 'release-please-*'
+    tags-ignore:
+      - "*.*.*"
+
+jobs:
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      release_created: ${{ steps.release-please.outputs.release_created }}
+      tag_name: ${{ steps.release-please.outputs.tag_name }}
+      version: ${{ steps.release-please.outputs.version }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release-please
+        with:
+          manifest-file: .github/release-please-manifest.json
+          config-file: .github/release-please-config.json
+
+  lint:
+    name: Rubocop Linting
+    runs-on: ubuntu-latest
+    env:
+      BUNDLE_PATH: vendor/bundle
+      BUNDLE_WITHOUT: "default test"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.3
+          bundler-cache: true
+      - run: bundle exec rubocop --parallel --format=progress --format=github
+
+  build:
+    name: Build Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Parse and normalize branch name
+        id: info
+        run: |
+          IMAGE=ghcr.io/${{ github.repository }}
+
+          REF_NAME="${GITHUB_REF_NAME//\//-}"
+          if [ -z "REF_NAME" ]; then exit 1; fi
+          echo "ref_name=${REF_NAME}" >> "$GITHUB_OUTPUT"
+
+          VER="$(git describe --tags 2>/dev/null)"
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+
+          echo 'docker_images<<EOF' >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF" == "refs/heads/main" ]]; then
+            echo "${IMAGE}:latest" >> "$GITHUB_OUTPUT"
+            echo "${IMAGE}:main-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          elif [[ "$GITHUB_REF" == "refs/heads/"* ]]; then
+            echo "${IMAGE}:branch-${REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+          echo "${IMAGE}:commit-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo 'EOF' >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v5
+        with:
+          push: true
+          tags: ${{ steps.info.outputs.docker_images }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ steps.info.outputs.version }}
+          provenance: false
+  
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: ${{ !contains(github.event.head_commit.message, '[skip test]') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - run: docker pull ghcr.io/${{ github.repository }}:commit-${{ github.sha }}
+      - run: >-
+          docker-compose run app sh -c "bin/rails db:schema:load && bin/rspec"
+        env:
+          APP_IMAGE_URL: ghcr.io/${{ github.repository }}:commit-${{ github.sha }}
+          CACHE_DIR: /cache/${{ github.repository }}
+
+  publish-release:
+    name: Publish Release Image
+    runs-on: ubuntu-latest
+    needs: [build, test, release-please]
+    if: needs.release-please.outputs.release_created
+    steps:
+      - uses: actions/checkout@v4
+      
+      # Publish Docker Image
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - run: docker pull ghcr.io/${{ github.repository }}:commit-${{ github.sha }}
+      - name: Tag and push release images
+        run: |
+          docker tag ghcr.io/${{ github.repository }}:commit-${{ github.sha }} \
+            ghcr.io/${{ github.repository }}:${{ needs.release-please.outputs.version }}
+          docker push ghcr.io/${{ github.repository }}:${{ needs.release-please.outputs.version }}
+      
+      # Publish Helm Chart
+      
+      - uses: azure/setup-helm@v4
+        with:
+          version: "latest"
+      - run: |
+          helm registry login 'ghcr.io' \
+            --username '${{ github.actor }}' \
+            --password '${{ secrets.GITHUB_TOKEN }}'
+      - name: Build Package
+        run: |
+          helm package ./chart/
+          helm push example_app-*.tgz \
+            'oci://ghcr.io/${{ github.repository }}/charts'

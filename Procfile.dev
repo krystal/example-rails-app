@@ -1,0 +1,4 @@
+web: unset PORT; bundle exec puma -C config/puma.rb
+worker: bin/sidekiq
+js: yarn build --watch
+css: yarn build:css --watch

@@ -1,0 +1,20 @@
+{{- if eq .Values.postgres.mode "builtin" }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "app.generateName" (dict "root" . "suffix" "postgres") }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+  annotations:
+    {{ include "app.argocdAnnotations" (dict "root" . "wave" 1) | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 8Gi
+  {{ if .Values.global.storageClass }}
+  storageClassName: {{ .Values.global.storageClass }}
+  {{ end }}
+{{- end }}

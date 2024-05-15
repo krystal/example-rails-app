@@ -1,0 +1,14 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "app.generateName" (dict "root" . "suffix" "tls") }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+  annotations:
+    {{- include "app.argocdAnnotations" (dict "root" . "wave" 5) | nindent 4 }}
+spec:
+  secretName: {{ include "app.generateName" (dict "root" . "suffix" "tls") }}
+  dnsNames:
+    - {{ (dig "exampleApp" "webHostname" .Values.appConfigDefaults.exampleApp.webHostname .Values.appConfig) }}
+  issuerRef: {{ toYaml .Values.externalCertificateIssuer | nindent 4 }}
