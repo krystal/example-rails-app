@@ -5,7 +5,7 @@ services:
     restart: always
     shm_size: 512mb
     environment:
-      POSTGRES_DB: example_app_test
+      POSTGRES_DB: example_test
       POSTGRES_PASSWORD: password
     ports:
       - "5432:5432"
